@@ -63,9 +63,12 @@ def test(arm, dynamics, goal, renderer, controller, gui, args, dist_limit, time_
         pos_ee = arm.dynamics.compute_fk(new_state)
         dist = np.linalg.norm(pos_ee - goal)
         vel_ee = np.linalg.norm(arm.dynamics.compute_vel_ee(state))
-    if dist < dist_limit and vel_ee < 0.5:
-            return 1, pos_ee, vel_ee
-    return 0, pos_ee, vel_ee
+    if dist < dist_limit[0] and vel_ee < 0.5:
+            return 'full', pos_ee, vel_ee
+    elif dist < dist_limit[1] and vel_ee < 0.5:
+            return 'partial', pos_ee, vel_ee
+    else:
+        return 'fail', pos_ee, vel_ee
 
 # Take random Goal
 def sample_goal():
@@ -124,21 +127,29 @@ def score_mpc_true_dynamics(controller, gui):
             print("Test ", i+1)
             try:
                 result, pos_ee, vel_ee = test(arm, dynamics, goal, renderer, \
-                          controller, gui, args, dist_limit=0.15, time_limit=5.0)
+                          controller, gui, args, dist_limit=[0.1, 0.2], time_limit=5.0)
             except NotImplementedError as e:
                 print(e)
                 print("Skipping tests")
                 continue
-            if result:
-                print(f'success!\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+            if result=='full':
+                print(f'Success! :)\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
                 if i == 0:
                     print('score:', '1.5/1.5')
                     score += 1.5
                 else:
                     print('score:', '1.0/1.0')
                     score += 1.0
-            else:
-                print(f'fail\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+            elif result=='partial':
+                print(f'Partial Success:|\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+                if i==0:
+                  print('score:', '1.0/1.5')
+                  score += 1.0
+                else:
+                  print('score:', '0.5/1.0')
+                  score += 0.5
+            elif result=='fail':
+                print(f'Fail! :(\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
                 if i==0:
                   print('score:', '0/1.5')
                 else:
@@ -196,16 +207,20 @@ def score_mpc_learnt_dynamics(controller, arm_student, model_path, gui):
             print("Test ", i+1)
             try:
                 result, pos_ee, vel_ee = test(arm, dynamics, goal, renderer, \
-                          controller, gui, args, dist_limit=0.2, time_limit=2.5)
+                          controller, gui, args, dist_limit=[0.2, 0.3], time_limit=2.5)
             except Exception as e:
                 print(e)
                 continue
-            if result:
-                print(f'success!\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+            if result=='full':
+                print(f'Success! :)\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
                 print('score:', '0.5/0.5')
                 score += 0.5
+            elif result=='partial':
+                print(f'Partial success :|\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+                print('score:', '0.3/0.5')
+                score += 0.25
             else:
-                print(f'fail\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+                print(f'Fail :(\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
                 print('score:', '0/0.5')
     print("       ")
     print("-------------------------")
