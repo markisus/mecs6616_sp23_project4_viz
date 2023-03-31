@@ -22,7 +22,6 @@ def get_args():
     parser.add_argument('--link_length', type=float, default=1)
     parser.add_argument('--friction', type=float, default=0.1)
     parser.add_argument('--time_step', type=float, default=0.01)
-    parser.add_argument('--time_limit', type=float, default=2.5)
 
     # Dynamics
     parser.add_argument('--model_dir', type=str, default="models")
@@ -40,9 +39,9 @@ def get_args():
 
 
 
-def test(arm, dynamics, goal, renderer, controller, gui, args, limit):
+def test(arm, dynamics, goal, renderer, controller, gui, args, dist_limit, time_limit):
 
-    num_steps = round(args.time_limit / args.time_step)
+    num_steps = round(time_limit / args.time_step)
     initial_state = np.zeros((arm.dynamics.get_state_dim(), 1))  # position + velocity
     initial_state[0] = -math.pi / 2.0
     # Controller to reach goals
@@ -64,9 +63,18 @@ def test(arm, dynamics, goal, renderer, controller, gui, args, limit):
         pos_ee = arm.dynamics.compute_fk(new_state)
         dist = np.linalg.norm(pos_ee - goal)
         vel_ee = np.linalg.norm(arm.dynamics.compute_vel_ee(state))
-        if dist < limit and vel_ee < 1.0:
-            return 1
-    return 0
+    if dist < dist_limit and vel_ee < 0.5:
+            return 1, pos_ee, vel_ee
+    return 0, pos_ee, vel_ee
+
+# Take random Goal
+def sample_goal():
+  goal = np.zeros((2,1))
+  r = np.random.uniform(low=0.05, high=1.95)
+  theta = np.random.uniform(low=np.pi, high=2.0*np.pi)
+  goal[0,0] = r * np.cos(theta)
+  goal[1,0] = r * np.sin(theta)
+  return goal
 
 def get_goal(radius, angle):
     angle -= np.pi/2
@@ -115,13 +123,14 @@ def score_mpc_true_dynamics(controller, gui):
         for i, goal in enumerate(GOALS[num_links]):
             print("Test ", i+1)
             try:
-                result = test(arm, dynamics, goal, renderer, controller, gui, args, limit=0.15)
+                result, pos_ee, vel_ee = test(arm, dynamics, goal, renderer, \
+                          controller, gui, args, dist_limit=0.15, time_limit=5.0)
             except NotImplementedError as e:
                 print(e)
                 print("Skipping tests")
                 continue
             if result:
-                print("success!")
+                print(f'success!\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
                 if i == 0:
                     print('score:', '1.5/1.5')
                     score += 1.5
@@ -129,7 +138,7 @@ def score_mpc_true_dynamics(controller, gui):
                     print('score:', '1.0/1.0')
                     score += 1.0
             else:
-                print("fail")
+                print(f'fail\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
                 if i==0:
                   print('score:', '0/1.5')
                 else:
@@ -146,7 +155,7 @@ def score_mpc_learnt_dynamics(controller, arm_student, model_path, gui):
     args, unknown = get_args()
     GOALS = {
         1 : [get_goal(1, 0.4), get_goal(1, -0.75)],
-        2 : [get_goal(1.75, 0.4), get_goal(1.75, -0.75)],
+        2 : [sample_goal() for _ in range(16)],
         3 : [get_goal(2.2, -1.0), get_goal(1.8, -0.25), get_goal(1.5, 7.1), get_goal(1.3, -0.5), get_goal(0.9, 5.1)]
     }
 
@@ -158,7 +167,7 @@ def score_mpc_learnt_dynamics(controller, arm_student, model_path, gui):
     score = 0.0
     print("Part2: EVALUATING CONTROLLER + LEARNED DYNAMICS")
     print("-----------------------------------------------")
-    for num_links in range(3, 4):
+    for num_links in range(2, 3):
         print("NUM_LINKS:", num_links)
         # Arm
         arm = Robot(
@@ -186,20 +195,21 @@ def score_mpc_learnt_dynamics(controller, arm_student, model_path, gui):
         for i, goal in enumerate(GOALS[num_links]):
             print("Test ", i+1)
             try:
-                result = test(arm, dynamics, goal, renderer, controller, gui, args, limit=0.5)
+                result, pos_ee, vel_ee = test(arm, dynamics, goal, renderer, \
+                          controller, gui, args, dist_limit=0.2, time_limit=2.5)
             except Exception as e:
                 print(e)
                 continue
             if result:
-                print("success!")
-                print('score:', '1.5/1.5')
-                score += 1.5
+                print(f'success!\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+                print('score:', '0.5/0.5')
+                score += 0.5
             else:
-                print("fail")
-                print('score:', '0/1.5')
+                print(f'fail\n Goal: {GOALS[num_links][i].reshape(-1)}, Final position: {pos_ee.reshape(-1)}, Final velocity: {vel_ee.reshape(-1)}')
+                print('score:', '0/0.5')
     print("       ")
     print("-------------------------")
-    print("Part 2 SCORE: ", f"{score}/7.5")
+    print("Part 2 SCORE: ", f"{min(score, 7.5)}/7.5")
     print("-------------------------")
 
     if renderer is not None:
