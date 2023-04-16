@@ -11,7 +11,6 @@ from imgui_sdl_wrapper import ImguiSdlWrapper
 from mpc import *
 from overlayable import *
 from robot import Robot
-from score import *
 import imgui
 import math
 import numpy as np
@@ -21,6 +20,16 @@ parser = argparse.ArgumentParser(description="Visualizer for Robotic Learning HW
 parser.add_argument("--use-student", action="store_true", default=False, help="Use the ArmDynamicsStudent instead of true dynamics for the MPC")
 
 args = parser.parse_args()
+
+# copied from score.py
+# to not pull in unnecessary dependencies
+def sample_goal():
+  goal = np.zeros((2,1))
+  r = np.random.uniform(low=0.05, high=1.95)
+  theta = np.random.uniform(low=np.pi, high=2.0*np.pi)
+  goal[0,0] = r * np.cos(theta)
+  goal[1,0] = r * np.sin(theta)
+  return goal
 
 np.set_printoptions(suppress=True)
 app = ImguiSdlWrapper("Simulator", 1280, 720)
