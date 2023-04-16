@@ -3,7 +3,7 @@ Forked from https://github.com/roamlab/mecs6616_sp23_project4.git
 
 You will need to locally pip install any dependencies from the original repo.  
 Additionally you may need to run
-`pip install imgui[sdl]`.
+`pip install imgui[sdl2]`.
 
 On Windows you will also need
 `pip install pysdl2-dll`.  
